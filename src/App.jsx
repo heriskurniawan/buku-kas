@@ -1,11 +1,14 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import Header from './components/Header'
 import Dashboard from './components/Dashboard'
 import Balance from './components/Balance'
 import TransactionForm from './components/TransactionForm'
 import TransactionList from './components/TransactionList'
-
-const API = '/api'
+import {
+  getKasList, createKas, updateKas, deleteKas,
+  getTransaksi, createTransaksi, updateTransaksi, deleteTransaksi,
+  getSaldo,
+} from './db'
 
 export default function App() {
   const [transactions, setTransactions] = useState([])
@@ -16,79 +19,62 @@ export default function App() {
   const [activeKasId, setActiveKasId] = useState(null)
   const [menu, setMenu] = useState('dashboard')
 
-  const fetchKas = useCallback(async () => {
-    const res = await fetch(`${API}/kas`)
-    const data = await res.json()
-    setKasList(data)
-    if (data.length > 0 && !activeKasId) {
-      setActiveKasId(data[0].id)
-    }
-  }, [activeKasId])
+  useEffect(() => {
+    getKasList().then(data => {
+      setKasList(data)
+      if (data.length > 0 && !activeKasId) {
+        setActiveKasId(data[0].id)
+      }
+    })
+  }, [])
 
-  useEffect(() => { fetchKas() }, [fetchKas])
-
-  const fetchData = useCallback(async () => {
+  const fetchData = () => {
     if (!activeKasId) return
-    const params = new URLSearchParams({ kas_id: activeKasId })
-    const [txRes, saldoRes] = await Promise.all([
-      fetch(`${API}/transaksi?${params}`),
-      fetch(`${API}/saldo?${params}`),
-    ])
-    setTransactions(await txRes.json())
-    setSaldo(await saldoRes.json())
-  }, [activeKasId])
+    Promise.all([
+      getTransaksi(activeKasId),
+      getSaldo(activeKasId),
+    ]).then(([tx, s]) => {
+      setTransactions(tx)
+      setSaldo(s)
+    })
+  }
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => { fetchData() }, [activeKasId])
+
+  const refreshKas = () => {
+    getKasList().then(setKasList)
+  }
 
   const handleSelectKas = (id) => {
     setActiveKasId(id)
   }
 
   const handleAddKas = async (nama) => {
-    await fetch(`${API}/kas`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nama }),
-    })
-    fetchKas()
+    await createKas(nama)
+    refreshKas()
   }
 
   const handleRenameKas = async (id, nama) => {
-    await fetch(`${API}/kas/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nama }),
-    })
-    fetchKas()
+    await updateKas(id, nama)
+    refreshKas()
   }
 
   const handleDeleteKas = async (id) => {
     if (!confirm('Yakin ingin menghapus KAS ini?')) return
-    const res = await fetch(`${API}/kas/${id}`, { method: 'DELETE' })
-    if (!res.ok) {
-      const err = await res.json()
-      alert(err.error || 'Gagal menghapus KAS')
-      return
+    try {
+      await deleteKas(id)
+      if (activeKasId === id) setActiveKasId(null)
+      refreshKas()
+    } catch (err) {
+      alert(err.message)
     }
-    if (activeKasId === id) {
-      setActiveKasId(null)
-    }
-    fetchKas()
   }
 
   const handleSubmit = async (data) => {
     if (editing) {
-      await fetch(`${API}/transaksi/${editing.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
+      await updateTransaksi(editing.id, data)
     } else {
-      await fetch(`${API}/transaksi`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
+      await createTransaksi(data)
     }
     setEditing(null)
     setShowForm(false)
@@ -97,7 +83,7 @@ export default function App() {
 
   const handleDelete = async (id) => {
     if (!confirm('Yakin ingin menghapus transaksi ini?')) return
-    await fetch(`${API}/transaksi/${id}`, { method: 'DELETE' })
+    await deleteTransaksi(id)
     fetchData()
   }
 

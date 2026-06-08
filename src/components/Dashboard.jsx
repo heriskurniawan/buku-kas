@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
+import { getLaporan, getTransaksi, getSaldo } from '../db'
 
-const API = '/api'
 const formatRp = (n) =>
   new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n)
 
@@ -11,11 +11,10 @@ export default function Dashboard({ activeKasId }) {
 
   useEffect(() => {
     if (!activeKasId) return
-    const params = new URLSearchParams({ kas_id: activeKasId })
     Promise.all([
-      fetch(`${API}/laporan?${params}`).then(r => r.json()),
-      fetch(`${API}/transaksi?${params}`).then(r => r.json()),
-      fetch(`${API}/saldo?${params}`).then(r => r.json()),
+      getLaporan(activeKasId),
+      getTransaksi(activeKasId),
+      getSaldo(activeKasId),
     ]).then(([lap, tx, s]) => {
       setLaporan(lap)
       setTransaksi(tx.slice(0, 5))
