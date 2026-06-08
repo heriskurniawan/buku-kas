@@ -1,0 +1,7 @@
+node_modules/
+dist/
+buku_kas.db
+buku_kas.db-shm
+buku_kas.db-wal
+.env
+*.log
